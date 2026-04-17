@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Expense Tracker (Pro)</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body {
+  font-family: Arial;
+  margin: 0;
+  padding: 20px;
+  background: linear-gradient(to right, #1e3c72, #2a5298);
+  color: #fff;
+  text-align: center;
+}
+
+.container {
+  max-width: 500px;
+  margin: auto;
+  background: #fff;
+  color: #333;
+  padding: 20px;
+  border-radius: 15px;
+}
+
+.dark {
+  background: #121212;
+  color: #fff;
+}
+
+.dark .container {
+  background: #1e1e1e;
+  color: #fff;
+}
+
+input, select, button {
+  width: 60%;
+  padding: 10px;
+  margin: 5px;
+}
+
+button {
+  background: red;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+ul { list-style: none; padding: 0; }
+
+li {
+  background: #ccc9c9;
+  margin: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.income { border-left: 5px solid green; }
+.expense { border-left: 5px solid red; }
+
+.delete-btn {
+  background: black;
+  color: white;
+  width: 60px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <h2>Login</h2>
+  <input type="text" id="username" placeholder="Enter username">
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+
+<h1>💰 Expense Tracker (GHS)</h1>
+
+<div class="container">
+
+<button onclick="toggleDarkMode()">🌙 Dark Mode</button>
+<button onclick="generateMonthlyReport()">📊 Monthly Report</button>
+<button onclick="exportCSV()">⬇ CSV</button>
+<button onclick="exportPDF()">📄 PDF</button>
+
+<h2>Balance: GH₵ <span id="balance">0</span></h2>
+
+<form id="form">
+  <input type="text" id="text" placeholder="Description" required>
+  <input type="number" id="amount" placeholder="Amount (+income, -expense)" required>
+  <input type="date" id="date" required>
+
+  <select id="category">
+    <option>Food</option>
+    <option>Transport</option>
+    <option>Bills</option>
+    <option>Shopping</option>
+    <option>Other</option>
+  </select>
+
+  <button>Add</button>
+</form>
+
+<ul id="list"></ul>
+
+<canvas id="chart"></canvas>
+
+</div>
+</div>
+
+<script>
+let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+
+const list = document.getElementById('list');
+const balance = document.getElementById('balance');
+const form = document.getElementById('form');
+const chartCanvas = document.getElementById('chart');
+
+let chart;
+
+// LOGIN
+function login() {
+  const user = document.getElementById('username').value;
+  if (user) {
+    localStorage.setItem("user", user);
+    showApp();
+  }
+}
+
+function showApp() {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+if (localStorage.getItem("user")) showApp();
+
+// DARK MODE
+function toggleDarkMode() {
+  document.body.classList.toggle('dark');
+}
+
+// ADD TRANSACTION
+form.addEventListener('submit', e => {
+  e.preventDefault();
+
+  const t = {
+    text: text.value,
+    amount: +amount.value,
+    date: date.value,
+    category: category.value
+  };
+
+  transactions.push(t);
+  updateUI();
+  form.reset();
+});
+
+// UPDATE UI
+function updateUI() {
+  list.innerHTML = '';
+  let total = 0;
+
+  transactions.forEach((t, i) => {
+    total += t.amount;
+
+    const li = document.createElement('li');
+    li.classList.add(t.amount > 0 ? 'income' : 'expense');
+
+    li.innerHTML = `
+      <div>
+        ${t.text}<br>
+        ${t.category} | ${t.date}<br>
+        GH₵ ${t.amount}
+      </div>
+      <button class="delete-btn" onclick="deleteTransaction(${i})">X</button>
+    `;
+
+    list.appendChild(li);
+  });
+
+  balance.innerText = total.toFixed(2);
+  localStorage.setItem('transactions', JSON.stringify(transactions));
+
+  updateChart();
+}
+
+// DELETE
+function deleteTransaction(i) {
+  transactions.splice(i, 1);
+  updateUI();
+}
+
+// CHART
+function updateChart() {
+  const dataMap = {};
+
+  transactions.forEach(t => {
+    if (t.amount < 0) {
+      dataMap[t.category] = (dataMap[t.category] || 0) + Math.abs(t.amount);
+    }
+  });
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(chartCanvas, {
+    type: 'pie',
+    data: {
+      labels: Object.keys(dataMap),
+      datasets: [{
+        data: Object.values(dataMap)
+      }]
+    }
+  });
+}
+
+// CSV EXPORT
+function exportCSV() {
+  let csv = "Description,Amount,Category,Date\n";
+  transactions.forEach(t => {
+    csv += `${t.text},${t.amount},${t.category},${t.date}\n`;
+  });
+
+  const blob = new Blob([csv]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = "expenses.csv";
+  a.click();
+}
+
+// PDF EXPORT
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  let y = 10;
+  doc.text("Expense Report", 10, y);
+  y += 10;
+
+  transactions.forEach(t => {
+    doc.text(`${t.text} | GH₵ ${t.amount} | ${t.category} | ${t.date}`, 10, y);
+    y += 10;
+  });
+
+  doc.save("expenses.pdf");
+}
+
+// MONTHLY REPORT
+function generateMonthlyReport() {
+  const report = {};
+
+  transactions.forEach(t => {
+    const m = t.date.slice(0,7);
+
+    if (!report[m]) report[m] = { income: 0, expense: 0 };
+
+    if (t.amount > 0) report[m].income += t.amount;
+    else report[m].expense += t.amount;
+  });
+
+  alert(JSON.stringify(report, null, 2));
+}
+
+updateUI();
+</script>
+
+</body>
+</html>
