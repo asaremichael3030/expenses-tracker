@@ -16,6 +16,7 @@ JavaScript (Vanilla JS) – Functionality and logic
 Local Storage API – Data persistence
 
 📸 Preview
+<img width="1920" height="1080" alt="Screenshot 2026-04-23 060251" src="https://github.com/user-attachments/assets/4a81efa0-c7b7-4d43-82f3-6cc13bd6bfba" />
 <img width="1920" height="1482" alt="screencapture-expensestracker11-netlify-app-2026-04-19-16_11_09" src="https://github.com/user-attachments/assets/0b833aa5-7458-4193-947d-c7503e06d890" />
 
 ⚙️ How to Use
